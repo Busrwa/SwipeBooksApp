@@ -1,20 +1,42 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useContext } from 'react';
+import { StatusBar } from 'react-native';
 
-export default function App() {
+import { ThemeProvider, ThemeContext } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';   // AuthContext sağlandı
+import AppNavigator from './navigation/AppNavigator';
+
+import * as NavigationBar from 'expo-navigation-bar';
+import * as SystemUI from 'expo-system-ui';
+
+function InnerApp() {
+  const { darkMode } = useContext(ThemeContext);
+
+  useEffect(() => {
+    // Sistem çubuklarını ve navigasyon barını özelleştir
+    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setBackgroundColorAsync('transparent');
+    SystemUI.setBackgroundColorAsync('transparent');
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <>
+      <StatusBar
+        barStyle={darkMode ? 'light-content' : 'dark-content'}
+        translucent={true}
+        backgroundColor="transparent"
+        hidden={false}
+      />
+      <AppNavigator />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <InnerApp />
+      </ThemeProvider>
+    </AuthProvider>
+  );
+}
