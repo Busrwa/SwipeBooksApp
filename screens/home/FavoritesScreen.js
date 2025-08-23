@@ -333,17 +333,7 @@ const styles = StyleSheet.create({
   header: { fontSize: SCREEN_WIDTH * 0.07, fontWeight: 'bold', marginBottom: SCREEN_HEIGHT * 0.03, textAlign: 'center' },
   limitWarningContainer: { padding: SCREEN_HEIGHT * 0.015, borderRadius: 8, marginBottom: SCREEN_HEIGHT * 0.02, borderWidth: 1 },
   limitWarningText: { fontSize: SCREEN_WIDTH * 0.04, textAlign: 'center', fontWeight: '600' },
-  card: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    elevation: 3,
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    padding: SCREEN_WIDTH * 0.03,
-    marginBottom: SCREEN_HEIGHT * 0.02,
-    alignItems: 'center'
-  },
+  card: { flexDirection: 'row', borderRadius: 12, marginBottom: 12, overflow: 'hidden', elevation: 2, alignItems: 'center', padding: SCREEN_WIDTH * 0.03, position: 'relative' },
   cover: { width: SCREEN_WIDTH * 0.28, height: SCREEN_HEIGHT * 0.20, borderRadius: 5, backgroundColor: '#ddd' },
   noCover: { justifyContent: 'center', alignItems: 'center' },
   noCoverText: { fontSize: SCREEN_WIDTH * 0.035 },

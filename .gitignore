@@ -4,6 +4,8 @@
 node_modules/
 
 services/
+android/
+
 # Expo
 .expo/
 dist/

@@ -26,6 +26,7 @@ import { ThemeContext } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const scale = SCREEN_WIDTH / 375; // iPhone 6/7/8 genişliği referans
+import { AuthContext } from '../../context/AuthContext';
 
 function normalize(size) {
   const newSize = size * scale;
@@ -105,29 +106,48 @@ export default function SwipeScreen({ navigation }) {
 
   const hideAlert = () => setAlertVisible(false);
 
-
+  const { user } = useContext(AuthContext);
 
   const currentBook = books[currentIndex] || null;
 
   useEffect(() => {
-    const loadBooks = async () => {
+    const loadBooksAndIndex = async () => {
       setLoading(true);
       const bookList = await fetchBooksFromBackend();
 
-      // Kitapları karıştır (random sırada göster)
-      const shuffled = bookList
-        .map(value => ({ value, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map(({ value }) => value);
+      // Random sıralamayı kaldır, veritabanından geldiği sırayla kullan
+      setBooks(bookList);
 
-      setBooks(shuffled);
+      // Kullanıcının kaldığı yeri Firestore'dan al
+      if (user?.uid) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          const savedIndex = userSnap.data().lastViewedBookIndex || 0;
+          setCurrentIndex(savedIndex);
+        }
+      }
+
       setLoading(false);
     };
 
-    loadBooks();
-  }, []);
+    loadBooksAndIndex();
+  }, [user]);
 
-  const showNextBook = () => setCurrentIndex(prev => prev + 1);
+  const showNextBook = async () => {
+    setCurrentIndex(prev => {
+      const nextIndex = prev + 1;
+
+      // Firestore'a kullanıcı için son görülen kitap indeksini kaydet
+      if (user?.uid) {
+        const userDocRef = doc(db, 'users', user.uid);
+        updateDoc(userDocRef, { lastViewedBookIndex: nextIndex }).catch(console.error);
+      }
+
+      return nextIndex;
+    });
+  };
+
 
   const updateBookScore = async (book, field, incrementValue) => {
     if (!book?.title) return;
