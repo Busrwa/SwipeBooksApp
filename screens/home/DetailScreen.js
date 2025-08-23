@@ -17,7 +17,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { FavoritesContext } from '../../context/FavoritesContext';
-import { doc, getDoc, updateDoc, arrayUnion, setDoc, Timestamp, increment, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, setDoc, Timestamp, increment, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../../services/firebase';
 import Octicons from '@expo/vector-icons/Octicons';
@@ -25,6 +25,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
+import { Linking } from 'react-native';
 
 import { ThemeContext } from '../../context/ThemeContext';
 
@@ -99,6 +100,14 @@ export default function DetailScreen({ route, navigation }) {
   const [hasLiked, setHasLiked] = useState(false);
   const [hasDisliked, setHasDisliked] = useState(false);
 
+  const [likeCount, setLikeCount] = useState(0);
+  const buttonsDisabled = editModalVisible || reportModalVisible || titleModalVisible || modalVisible;
+
+  const [likeProcessing, setLikeProcessing] = useState(false);
+  const [dislikeProcessing, setDislikeProcessing] = useState(false);
+
+  const [buttonsTempDisabled, setButtonsTempDisabled] = useState(false);
+
 
   const showFeedback = (message) => {
     setModalMessage(message);
@@ -112,30 +121,44 @@ export default function DetailScreen({ route, navigation }) {
       return;
     }
 
-    if (hasLiked) {
-      showFeedback('Bu kitabı zaten beğendiniz!');
-      return;
-    }
-
-    if (hasDisliked) {
-      showFeedback('Bu kitap için daha önce beğenmeme tuşuna bastınız.');
-      return;
-    }
+    if (likeProcessing || buttonsTempDisabled) return;
+    setLikeProcessing(true);
+    setButtonsTempDisabled(true);
 
     try {
-      await updateDoc(bookDocRef, {
-        likes: increment(1),
-        likesHistory: arrayUnion(Timestamp.now()),
-      });
-      await updateDoc(doc(db, 'users', user.uid), {
-        likedBooks: arrayUnion(book.id)
-      });
-      showFeedback('Kitabı beğendiniz!');
-      setHasLiked(true);
+      const bookSnap = await getDoc(bookDocRef);
+      const bookData = bookSnap.exists() ? bookSnap.data() : null;
+
+      if (hasLiked) {
+        // LikesHistory'den son eklenen kaydı çıkar
+        const lastLikeTimestamp = bookData?.likesHistory?.[bookData.likesHistory.length - 1];
+        await updateDoc(bookDocRef, {
+          likes: increment(-1),
+          likesHistory: lastLikeTimestamp ? arrayRemove(lastLikeTimestamp) : [],
+        });
+        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayRemove(book.id) });
+        setHasLiked(false);
+        showFeedback('Beğeniyi geri aldınız.');
+      } else if (hasDisliked) {
+        showFeedback('Bu kitap için daha önce beğenmeme tuşuna bastınız.');
+      } else {
+        const newTimestamp = Timestamp.now();
+        await updateDoc(bookDocRef, {
+          likes: increment(1),
+          likesHistory: arrayUnion(newTimestamp),
+        });
+        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayUnion(book.id) });
+        setHasLiked(true);
+        showFeedback('Kitabı beğendiniz!');
+      }
     } catch (error) {
       showFeedback('Beğenirken hata oluştu.');
+    } finally {
+      setLikeProcessing(false);
+      setTimeout(() => setButtonsTempDisabled(false), 2000);
     }
   };
+
 
   const handleDislike = async () => {
     if (!user) {
@@ -143,29 +166,45 @@ export default function DetailScreen({ route, navigation }) {
       return;
     }
 
-    if (hasDisliked) {
-      showFeedback('Bu kitabı zaten beğenmediniz!');
-      return;
-    }
-
-    if (hasLiked) {
-      showFeedback('Bu kitap için daha önce beğenme tuşuna bastınız.');
-      return;
-    }
+    if (dislikeProcessing || buttonsTempDisabled) return;
+    setDislikeProcessing(true);
+    setButtonsTempDisabled(true);
 
     try {
-      await updateDoc(bookDocRef, {
-        dislikes: increment(1),
-      });
-      await updateDoc(doc(db, 'users', user.uid), {
-        dislikedBooks: arrayUnion(book.id)
-      });
-      showFeedback('Kitabı beğenmediniz.');
-      setHasDisliked(true);
+      const bookSnap = await getDoc(bookDocRef);
+      const bookData = bookSnap.exists() ? bookSnap.data() : null;
+
+      if (hasDisliked) {
+        // dislikesHistory'den son eklenen kaydı çıkar
+        const lastDislikeTimestamp = bookData?.dislikesHistory?.[bookData.dislikesHistory.length - 1];
+        await updateDoc(bookDocRef, {
+          dislikes: increment(-1),
+          dislikesHistory: lastDislikeTimestamp ? arrayRemove(lastDislikeTimestamp) : [],
+        });
+        await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayRemove(book.id) });
+        setHasDisliked(false);
+        showFeedback('Beğenmeme geri alındı.');
+      } else if (hasLiked) {
+        showFeedback('Bu kitap için daha önce beğenme tuşuna bastınız.');
+      } else {
+        const newTimestamp = Timestamp.now();
+        await updateDoc(bookDocRef, {
+          dislikes: increment(1),
+          dislikesHistory: arrayUnion(newTimestamp),
+        });
+        await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayUnion(book.id) });
+        setHasDisliked(true);
+        showFeedback('Kitabı beğenmediniz.');
+      }
     } catch (error) {
       showFeedback('Beğenmeme sırasında hata oluştu.');
+    } finally {
+      setDislikeProcessing(false);
+      setTimeout(() => setButtonsTempDisabled(false), 2000);
     }
   };
+
+
 
   const handleAddFavorite = async () => {
     if (!user) {
@@ -190,16 +229,37 @@ export default function DetailScreen({ route, navigation }) {
     }
   };
 
+  const handleReportPress = async () => {
+    if (!book) return;
+
+    const email = 'info.swipeitofficial@gmail.com';
+    const subject = encodeURIComponent(`Kitap Hatası Bildirimi: ${book.title}`);
+    const body = encodeURIComponent(
+      `Merhaba,\n\n"${book.title}" adlı kitapla ilgili bir hata veya sorun bildirmek istiyorum.\n\nLütfen detayları buraya yazınız...\n`
+    );
+    const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    try {
+      await Linking.openURL(mailtoUrl);
+    } catch (error) {
+      showError('E-posta göndermek için telefonunuzda bir posta uygulaması bulunmalı.');
+    }
+  };
+
   const docId = useMemo(() => cleanDocId(book?.title), [book?.title]);
   const bookDocRef = useMemo(() => doc(db, 'books', docId), [docId]);
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onSnapshot(bookDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLikeCount(data.likes || 0); // Anlık beğeni sayısı
+      }
     });
-    return unsubscribe;
-  }, []);
+
+    return () => unsubscribe(); // Temizlik
+  }, [bookDocRef]);
+
 
   useEffect(() => {
     const fetchBookData = async () => {
@@ -211,7 +271,12 @@ export default function DetailScreen({ route, navigation }) {
             title: book.title,
             author: book.author,
             coverImageUrl: book.coverImageUrl || null,
+            likes: 0,
           });
+          setLikeCount(0);
+        } else {
+          const data = docSnap.data();
+          setLikeCount(data.likes || 0); // Firestore'daki toplam like sayısını state'e ata
         }
 
         const commentsDoc = await getDoc(doc(db, 'comments', docId));
@@ -456,15 +521,25 @@ export default function DetailScreen({ route, navigation }) {
           </View>
 
           <View style={[styles.bookInfo, { borderBottomColor: theme.border }]}>
-            <TouchableOpacity onPress={() => setTitleModalVisible(true)}>
-              {book.coverImageUrl ? (
-                <Image source={{ uri: book.coverImageUrl }} style={styles.cover} />
-              ) : (
-                <View style={[styles.cover, styles.noCover]}>
-                  <Text style={[styles.noCoverText, { color: theme.textSecondary }]}>Kapak Yok</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.coverContainer}>
+              <TouchableOpacity onPress={() => setTitleModalVisible(true)}>
+                {book.coverImageUrl ? (
+                  <Image source={{ uri: book.coverImageUrl }} style={styles.cover} />
+                ) : (
+                  <View style={[styles.cover, styles.noCover]}>
+                    <Text style={[styles.noCoverText, { color: theme.textSecondary }]}>Kapak Yok</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.topRightButton}
+                onPress={handleReportPress}
+              >
+                <Ionicons name="alert-circle-outline" size={28} color="red" />
+              </TouchableOpacity>
+            </View>
+
 
             <View style={styles.bookTextInfo}>
               <TouchableOpacity onPress={() => setTitleModalVisible(true)}>
@@ -475,11 +550,11 @@ export default function DetailScreen({ route, navigation }) {
               <Text style={[styles.bookAuthor, { color: theme.textSecondary }]}>{book.author}</Text>
               <View style={styles.buttonContainer}>
                 <TouchableOpacity onPress={handleLike}
-                  style={[styles.iconBox, { backgroundColor: '#e6f7e6' }]}>
+                  disabled={buttonsDisabled || buttonsTempDisabled} style={[styles.iconBox, { backgroundColor: '#e6f7e6' }]}>
                   <Octicons name="thumbsup" size={22} color="#34a853" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleDislike}
-                  style={[styles.iconBox, { backgroundColor: '#ffeaea' }]}>
+                  disabled={buttonsDisabled || buttonsTempDisabled} style={[styles.iconBox, { backgroundColor: '#ffeaea' }]}>
                   <Octicons name="thumbsdown" size={22} color="#ea4335" />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -489,6 +564,17 @@ export default function DetailScreen({ route, navigation }) {
                 >
                   <Ionicons name="heart" size={22} color="#d60056" />
                 </TouchableOpacity>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 }}>
+                <Octicons
+                  name="heart"
+                  size={22}
+                  color="#e63946"
+                  style={{ marginTop: 7 }}
+                />
+                <Text style={{ marginLeft: 6, fontWeight: 'bold', color: theme.textPrimary, marginTop: 8 }}>
+                  {likeCount} Beğeni
+                </Text>
               </View>
             </View>
           </View>
@@ -728,8 +814,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   cover: {
-    width: SCREEN_WIDTH * 0.3,
-    height: SCREEN_WIDTH * 0.42,
+    width: SCREEN_WIDTH * 0.30,
+    height: SCREEN_WIDTH * 0.48,
     borderRadius: 8,
     backgroundColor: '#eee',
   },
@@ -800,8 +886,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 10,
     alignItems: 'center',
-    paddingTop: 8, 
-
+    paddingTop: 2,
+    marginBottom: 30,
   },
   input: {
     flex: 1,
@@ -871,7 +957,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '90%',
     maxWidth: 400,
-    height: 200,
+    maxHeight: SCREEN_HEIGHT * 0.8,
+    padding: SCREEN_WIDTH * 0.05,
     padding: 20,
     borderRadius: 10,
     justifyContent: 'center',
@@ -896,5 +983,17 @@ const styles = StyleSheet.create({
   },
   feedbackModalText: {
     fontSize: 18,
+  },
+  coverContainer: {
+    position: 'relative',
+  },
+
+  topRightButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 5,
+    borderRadius: 20,
   },
 });

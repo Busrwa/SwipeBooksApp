@@ -260,22 +260,22 @@ export default function SwipeScreen({ navigation }) {
     setModalVisible(true);
   };
 
-  const handleReportPress = () => {
+  const handleReportPress = async () => {
+    if (!currentBook) return;
+
     const email = 'info.swipeitofficial@gmail.com';
-    const subject = encodeURIComponent(`Kitap Hatası Bildirimi: ${currentBook?.title || ''}`);
+    const subject = encodeURIComponent(`Kitap Hatası Bildirimi: ${currentBook.title}`);
     const body = encodeURIComponent(
-      `Merhaba,\n\n"${currentBook?.title || ''}" adlı kitapla ilgili bir hata veya sorun bildirmek istiyorum.\n\nLütfen detayları buraya yazınız...\n`
+      `Merhaba,\n\n"${currentBook.title}" adlı kitapla ilgili bir hata veya sorun bildirmek istiyorum.\n\nLütfen detayları buraya yazınız...\n`
     );
     const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
 
-    Linking.canOpenURL(mailtoUrl)
-      .then((supported) => {
-        if (!supported) Alert.alert('Hata', 'E-posta gönderme özelliği desteklenmiyor.');
-        else return Linking.openURL(mailtoUrl);
-      })
-      .catch(() => Alert.alert('Hata', 'E-posta gönderilirken bir hata oluştu.'));
+    try {
+      await Linking.openURL(mailtoUrl);
+    } catch (error) {
+      showAlert('Hata', 'E-posta göndermek için telefonunuzda bir posta uygulaması bulunmalı.');
+    }
   };
-
 
 
   const styles = StyleSheet.create({

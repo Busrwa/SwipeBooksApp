@@ -217,7 +217,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.optionText, { color: theme.textSecondary, textAlign: 'center', fontSize: SCREEN_WIDTH * 0.035, paddingTop: 20 }]}>
-          Versiyon: 1.1.4
+          Versiyon: 1.1.5
         </Text>
       </ScrollView>
 
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   infoSection: {
-    marginBottom: 32,
+    marginBottom: 5,
   },
   infoText: {
     fontSize: 16,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     borderBottomWidth: 1,
-    paddingVertical: 15,
+    paddingVertical: 20,
   },
   optionText: {
     fontSize: 18,

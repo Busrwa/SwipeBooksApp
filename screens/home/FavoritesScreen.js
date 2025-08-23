@@ -242,7 +242,7 @@ export default function FavoriteScreen({ navigation }) {
         }]}
 
 
-        theme={theme}  
+        theme={theme}
       >
         <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>Yazar: {selectedBook?.author}</Text>
         {selectedBook?.coverImageUrl && (
@@ -297,7 +297,7 @@ export default function FavoriteScreen({ navigation }) {
           style: styles.cancelButton,
           textStyle: styles.cancelButtonText,
         }]}
-        theme={theme}  
+        theme={theme}
       >
         <Text style={[styles.modalDescription, { color: theme.textSecondary }]}>
           Bu kitap favorilerinden kalıcı olarak kaldırılacak.
@@ -314,7 +314,7 @@ export default function FavoriteScreen({ navigation }) {
           style: styles.confirmButton,
           textStyle: styles.confirmButtonText,
         }]}
-        theme={theme}  
+        theme={theme}
       >
         <Ionicons
           name="alert-circle-outline"
@@ -344,11 +344,11 @@ const styles = StyleSheet.create({
     marginBottom: SCREEN_HEIGHT * 0.02,
     alignItems: 'center'
   },
-  cover: { width: SCREEN_WIDTH * 0.18, height: SCREEN_HEIGHT * 0.16, borderRadius: 8, backgroundColor: '#ddd' },
+  cover: { width: SCREEN_WIDTH * 0.28, height: SCREEN_HEIGHT * 0.20, borderRadius: 5, backgroundColor: '#ddd' },
   noCover: { justifyContent: 'center', alignItems: 'center' },
   noCoverText: { fontSize: SCREEN_WIDTH * 0.035 },
   info: { flex: 1, marginLeft: SCREEN_WIDTH * 0.04, justifyContent: 'center' },
-  title: { fontSize: SCREEN_WIDTH * 0.05, fontWeight: '600', marginBottom: SCREEN_HEIGHT * 0.008 },
+  title: { fontSize: SCREEN_WIDTH * 0.04, fontWeight: '600', marginBottom: SCREEN_HEIGHT * 0.005 },
   author: { fontSize: SCREEN_WIDTH * 0.04 },
   deleteButton: { padding: SCREEN_WIDTH * 0.015 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

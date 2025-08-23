@@ -11,6 +11,8 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { Animated } from 'react-native';
+
 import LottieView from 'lottie-react-native';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -278,7 +280,7 @@ const styles = StyleSheet.create({
   header: { fontSize: SCREEN_WIDTH * 0.06, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   list: { paddingBottom: 30 },
   card: { flexDirection: 'row', borderRadius: 12, marginBottom: 12, overflow: 'hidden', elevation: 2, alignItems: 'center', padding: SCREEN_WIDTH * 0.03, position: 'relative' },
-  cover: { width: SCREEN_WIDTH * 0.18, height: SCREEN_HEIGHT * 0.16, borderRadius: 8 },
+  cover: { width: SCREEN_WIDTH * 0.28, height: SCREEN_HEIGHT * 0.20, borderRadius: 5, backgroundColor: '#ddd' },
   noCover: { justifyContent: 'center', alignItems: 'center' },
   noCoverText: { fontSize: SCREEN_WIDTH * 0.035, textAlign: 'center' },
   info: { flex: 1, paddingLeft: SCREEN_WIDTH * 0.03, justifyContent: 'center' },
