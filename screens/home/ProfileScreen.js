@@ -18,7 +18,7 @@ import { db } from '../../services/firebase';
 import { useNavigation } from '@react-navigation/native';
 import { ThemeContext } from '../../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthContext } from '../../context/AuthContext'; // AuthContext import edildi
+import { AuthContext } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -167,9 +167,18 @@ export default function ProfileScreen() {
           <Text style={[styles.infoText, { color: theme.textSecondary }]}>
             Kullanıcı Adı: {username || 'Yükleniyor...'}
           </Text>
-          <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-            Üyelik Tipi: Standart
-          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              showMessage(
+                'Bu uygulamada şu anda yeni bir üyelik tipi mevcut değil. \nAyrıntılı bilgi için \ninfo.swipeitofficial@gmail.com ile iletişime geçebilirsiniz.',
+                'success'
+              );
+            }}
+          >
+            <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+              Üyelik Tipi: Standart
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tema */}
@@ -189,7 +198,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Şifre */}
+
         <TouchableOpacity
           style={[styles.optionButton, { borderBottomColor: theme.border }]}
           onPress={() => setModalVisible(true)}
@@ -197,7 +206,12 @@ export default function ProfileScreen() {
           <Text style={[styles.optionText, { color: theme.textPrimary }]}>Şifre Değiştir</Text>
         </TouchableOpacity>
 
-        {/* Diğer Linkler */}
+        <TouchableOpacity style={[styles.optionButton, { borderBottomColor: theme.border }]} onPress={() => navigation.navigate('BarcodeChoice')}>
+          <Text style={[styles.optionText, { color: theme.textPrimary }]}>ISBN veya Barkod ile Ara</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.optionButton, { borderBottomColor: theme.border }]} onPress={() => navigation.navigate('KitapEkle')}>
+          <Text style={[styles.optionText, { color: theme.textPrimary }]}>Kitap Önerisi Gönder</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.optionButton, { borderBottomColor: theme.border }]} onPress={() => navigation.navigate('PrivacyPolicy')}>
           <Text style={[styles.optionText, { color: theme.textPrimary }]}>Gizlilik Politikası</Text>
         </TouchableOpacity>
@@ -207,9 +221,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={[styles.optionButton, { borderBottomColor: theme.border }]} onPress={() => navigation.navigate('HelpSupport')}>
           <Text style={[styles.optionText, { color: theme.textPrimary }]}>Yardım & Destek</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.optionButton, { borderBottomColor: theme.border }]} onPress={() => navigation.navigate('KitapEkle')}>
-          <Text style={[styles.optionText, { color: theme.textPrimary }]}>Kitap Önerisi Gönder</Text>
-        </TouchableOpacity>
+
 
         {/* Çıkış */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
@@ -217,7 +229,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.optionText, { color: theme.textSecondary, textAlign: 'center', fontSize: SCREEN_WIDTH * 0.035, paddingTop: 20 }]}>
-          Versiyon: 1.1.5
+          Versiyon: 1.2.0
         </Text>
       </ScrollView>
 
