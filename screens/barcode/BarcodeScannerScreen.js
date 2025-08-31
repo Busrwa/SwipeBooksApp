@@ -12,9 +12,8 @@ export default function BarcodeScannerScreen() {
   const navigation = useNavigation();
 
   const [hasPermission, setHasPermission] = useState(null);
-  const [scanned, setScanned] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalMessage, setModalMessage] = useState('');
+  const [scanned, setScanned] = useState(true); // Başlangıçta tara butonu aktif
+  const [modalVisible, setModalVisible] = useState(false); // DetailScreen açılana kadar gösterilecek modal
 
   useEffect(() => {
     (async () => {
@@ -23,26 +22,29 @@ export default function BarcodeScannerScreen() {
     })();
   }, []);
 
-  const showModal = (message) => {
-    setModalMessage(message);
-    setModalVisible(true);
-  };
-
   const handleBarcodeScanned = async ({ data }) => {
-    console.log("Taranan ISBN:", data); // <- burası eklediğimiz kısım
-    setScanned(true);
+    setScanned(true); // Tara butonunu pasif yap
+    setModalVisible(true); // Modal göster
+
     const books = await fetchBooksFromBackend();
     const matchedBook = books.find(book => book.isbn === data);
 
-    if (matchedBook) {
-      navigation.navigate('DetailScreen', { book: matchedBook });
-    } else {
-      showModal('Üzgünüz, bu kitap şu anda veritabanımızda yok. Ancak önerilerinizi bize göndererek yeni kitaplar eklememize yardımcı olabilirsiniz.');
-    }
+    setTimeout(() => {
+      if (matchedBook) {
+        const safeBook = {
+          ...matchedBook,
+          createdAt: matchedBook.createdAt ? matchedBook.createdAt.toISOString() : null,
+        };
+        navigation.navigate('DetailScreen', { book: safeBook });
+      } else {
+        navigation.navigate('KitapEkle', { suggestedIsbn: data });
+      }
+      setModalVisible(false); // DetailScreen açıldıktan sonra modalı kapat
+    }, 800); // Kısa gecikme ile kullanıcı modalı görebilsin
   };
 
   if (hasPermission === null) return <Text style={{ textAlign: 'center', marginTop: 20, color: theme.textPrimary }}>Kamera izni isteniyor...</Text>;
-  if (hasPermission === false) return <Text style={{ textAlign: 'center', marginTop: 20, color: theme.textPrimary }}>Kamera izni verilmedi. İzin vermek için lütfen uygulamayı kapatıp açınız.</Text>;
+  if (hasPermission === false) return <Text style={{ textAlign: 'center', marginTop: 20, color: theme.textPrimary }}>Kamera izni verilmedi. Lütfen uygulamayı kapatıp açınız.</Text>;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -56,43 +58,20 @@ export default function BarcodeScannerScreen() {
       {/* Barkod Tarama Alanı */}
       <View style={[styles.scanBox, { borderColor: theme.toggleActive }]} />
 
-      {/* Tekrar Tara Butonu */}
-      {scanned && (
-        <TouchableOpacity onPress={() => setScanned(false)} style={[styles.scanButton, { backgroundColor: theme.toggleActive }]}>
-          <Text style={styles.scanButtonText}>Tekrar Tara</Text>
-        </TouchableOpacity>
-      )}
+      {/* Tara Butonu */}
+      <TouchableOpacity
+        onPress={() => setScanned(false)}
+        style={[styles.scanButton, { backgroundColor: scanned ? theme.toggleActive : '#999' }]}
+        disabled={!scanned} // Tara butonu sadece başta aktif, tarama başladıktan sonra pasif
+      >
+        <Text style={styles.scanButtonText}>Tara</Text>
+      </TouchableOpacity>
 
-      {/* Modal */}
-      <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+      {/* DetailScreen Açılıyor Modalı */}
+      <Modal transparent animationType="fade" visible={modalVisible}>
         <View style={styles.modalBackground}>
           <View style={[styles.modalContainer, { backgroundColor: theme.cardBackground }]}>
-            <Text style={[styles.modalMessage, { color: theme.textPrimary }]}>{modalMessage}</Text>
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-                  navigation.navigate('KitapEkle');
-
-                }}
-                style={[styles.modalButton, { backgroundColor: theme.toggleActive }]}
-              >
-                <Text style={[styles.modalButtonText, { color: theme.buttonTextColor || '#fff' }]}>
-                  Kitap Öner
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-
-                }}
-                style={[styles.modalButton, { backgroundColor: theme.cancelButton || '#999' }]}
-              >
-                <Text style={[styles.modalButtonText, { color: theme.buttonTextColor || '#fff' }]}>
-                  İptal
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.modalMessage, { color: theme.textPrimary }]}>Detail sayfası açılıyor...</Text>
           </View>
         </View>
       </Modal>
@@ -101,7 +80,6 @@ export default function BarcodeScannerScreen() {
 }
 
 const styles = StyleSheet.create({
-  modalButtonRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 20 },
   scanBox: {
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.25,
@@ -130,7 +108,5 @@ const styles = StyleSheet.create({
   scanButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
   modalBackground: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: SCREEN_WIDTH * 0.05 },
   modalContainer: { padding: 28, borderRadius: 14, width: '100%', maxWidth: 360, alignItems: 'center' },
-  modalMessage: { fontSize: 17, marginBottom: 18, textAlign: 'center' },
-  modalButton: { paddingVertical: 12, paddingHorizontal: 28, borderRadius: 12 },
-  modalButtonText: { color: '#fff', fontWeight: '700', fontSize: 17 },
+  modalMessage: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
 });
