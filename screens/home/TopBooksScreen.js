@@ -209,43 +209,48 @@ export default function TopBooksScreen({ navigation }) {
   useEffect(() => {
     setLoading(true);
 
-    if (activeTab === 'special') {
-      fetchSpecialBooks();
-    } else {
-      // Haftalık ve tüm zamanlar
-      const unsubscribe = onSnapshot(
-        collection(db, 'books'),
-        (querySnapshot) => {
-          const now = new Date();
-          const monday = getMondayUTC(now);
-          const sundayEnd = getSundayEndUTC(monday);
-
-          const allBooks = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            const likesHistory = Array.isArray(data.likesHistory) ? data.likesHistory : [];
-            const weeklyLikes = likesHistory.filter(ts => {
-              const dateObj = ts?.toDate?.();
-              return dateObj && dateObj >= monday && dateObj <= sundayEnd;
-            }).length;
-
-            return { id: doc.id, ...data, weeklyLikes };
-          });
-
-          const results = activeTab === 'weekly'
-            ? allBooks.filter(b => b.weeklyLikes > 0).sort((a, b) => b.weeklyLikes - a.weeklyLikes).slice(0, 10)
-            : allBooks.filter(b => b.likes > 0).sort((a, b) => b.likes - a.likes).slice(0, 10);
-
-          setBooks(results);
+    const fetchBooks = async () => {
+      try {
+        if (activeTab === 'special') {
+          await fetchSpecialBooks();
           setLoading(false);
-        },
-        (error) => {
-          console.log(error);
-          showAlert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
-          setLoading(false);
+          return;
         }
-      );
-      return () => unsubscribe();
-    }
+
+        // Haftalık mı tüm zamanlar mı?
+        const isWeekly = activeTab === 'weekly';
+
+        // Tüm kitapları çekiyoruz ama sadece gerekli alanlar
+        const snap = await getDocs(collection(db, 'books'));
+        const now = new Date();
+        const monday = getMondayUTC(now);
+        const sundayEnd = getSundayEndUTC(monday);
+
+        const allBooks = snap.docs.map(doc => {
+          const data = doc.data();
+          const likesHistory = Array.isArray(data.likesHistory) ? data.likesHistory : [];
+          const weeklyLikes = likesHistory.filter(ts => {
+            const dateObj = ts?.toDate?.();
+            return dateObj && dateObj >= monday && dateObj <= sundayEnd;
+          }).length;
+
+          return { id: doc.id, ...data, weeklyLikes };
+        });
+
+        const results = isWeekly
+          ? allBooks.filter(b => b.weeklyLikes > 0).sort((a, b) => b.weeklyLikes - a.weeklyLikes).slice(0, 10)
+          : allBooks.filter(b => b.likes > 0).sort((a, b) => b.likes - a.likes).slice(0, 10);
+
+        setBooks(results);
+      } catch (err) {
+        console.error(err);
+        showAlert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBooks();
   }, [activeTab]);
 
   if (loading) {
@@ -295,16 +300,12 @@ export default function TopBooksScreen({ navigation }) {
 
       <FlatList
         data={books}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <BookCard
-            item={item}
-            onPress={openBookModal}
-            onAddFavorite={addToFavorites}
-            theme={theme}
-          />
-        )}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({ item }) => <BookCard item={item} onPress={openBookModal} onAddFavorite={addToFavorites} theme={theme} />}
         contentContainerStyle={styles.list}
+        initialNumToRender={6}
+        windowSize={7}
+        removeClippedSubviews={true}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (
           <View style={{ paddingTop: 50, alignItems: 'center' }}>
@@ -318,6 +319,7 @@ export default function TopBooksScreen({ navigation }) {
           </View>
         )}
       />
+
 
       {/* Book Modal */}
       <Modal visible={bookModalVisible} animationType="fade" transparent onRequestClose={closeBookModal}>
