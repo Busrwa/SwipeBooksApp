@@ -5,16 +5,13 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  ActivityIndicator,
   Modal,
   TouchableOpacity,
   ScrollView,
   Dimensions,
 } from 'react-native';
-import { Animated } from 'react-native';
-
 import LottieView from 'lottie-react-native';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Ionicons } from '@expo/vector-icons';
 import { FavoritesContext } from '../../context/FavoritesContext';
@@ -22,7 +19,7 @@ import { ThemeContext } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Alert modal
+// --- Özel Alert Modal ---
 function CustomAlertModal({ visible, title, message, onClose, theme }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -30,7 +27,10 @@ function CustomAlertModal({ visible, title, message, onClose, theme }) {
         <View style={[styles.customModalContainer, { backgroundColor: theme.background }]}>
           <Text style={[styles.alertTitle, { color: theme.textPrimary }]}>{title}</Text>
           <Text style={[styles.alertMessage, { color: theme.textSecondary }]}>{message}</Text>
-          <TouchableOpacity style={[styles.alertButton, { backgroundColor: theme.toggleActive }]} onPress={onClose}>
+          <TouchableOpacity
+            style={[styles.alertButton, { backgroundColor: theme.toggleActive }]}
+            onPress={onClose}
+          >
             <Text style={styles.alertButtonText}>Tamam</Text>
           </TouchableOpacity>
         </View>
@@ -39,6 +39,7 @@ function CustomAlertModal({ visible, title, message, onClose, theme }) {
   );
 }
 
+// --- Kitap Kartı ---
 const BookCard = memo(({ item, onPress, onAddFavorite, theme }) => {
   const title = item.title?.trim() || 'Başlık Bilgisi Yok';
   const author = item.author?.trim() || 'Yazar Bilgisi Yok';
@@ -64,7 +65,9 @@ const BookCard = memo(({ item, onPress, onAddFavorite, theme }) => {
         <Text style={[styles.author, { color: theme.textSecondary }]}>{author}</Text>
         <View style={styles.stats}>
           <Ionicons name="heart" size={18} color="red" />
-          <Text style={[styles.likes, { color: 'red' }]}>{item.likes || 0}</Text>
+          <Text style={[styles.likes, { color: 'red' }]}>
+            {item.isbn === '9789944888349' ? '∞' : (item.likes || 0)}
+          </Text>
         </View>
       </View>
 
@@ -83,8 +86,11 @@ const BookCard = memo(({ item, onPress, onAddFavorite, theme }) => {
   );
 });
 
+// --- Ana Screen ---
 export default function TopBooksScreen({ navigation }) {
   const { theme } = useContext(ThemeContext);
+  const { addFavorite, favorites = [] } = useContext(FavoritesContext);
+
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bookModalVisible, setBookModalVisible] = useState(false);
@@ -92,48 +98,11 @@ export default function TopBooksScreen({ navigation }) {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const { addFavorite, favorites, isFavorite } = useContext(FavoritesContext);
   const [activeTab, setActiveTab] = useState('allTime');
 
-  useEffect(() => {
-    setLoading(true);
-    const unsubscribe = onSnapshot(
-      collection(db, 'books'),
-      (querySnapshot) => {
-        const now = new Date();
-        const monday = getMondayUTC(now);
-        const sundayEnd = getSundayEndUTC(monday);
+  const isFavorite = (book) => (favorites || []).some(fav => fav.id === book.id);
 
-        const allBooks = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          const likesHistory = data.likesHistory || [];
-          let weeklyLikes = 0;
-
-          if (Array.isArray(likesHistory)) {
-            weeklyLikes = likesHistory.filter(ts => {
-              const dateObj = ts?.toDate?.();
-              return dateObj && dateObj >= monday && dateObj <= sundayEnd;
-            }).length;
-          }
-
-          return { id: doc.id, ...data, weeklyLikes };
-        });
-
-        const results = activeTab === 'weekly'
-          ? allBooks.filter(book => (book.weeklyLikes || 0) > 0).sort((a, b) => b.weeklyLikes - a.weeklyLikes).slice(0, 10)
-          : allBooks.filter(book => book.likes > 0).sort((a, b) => b.likes - a.likes).slice(0, 10);
-
-        setBooks(results);
-        setLoading(false);
-      },
-      () => {
-        showAlert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
-  }, [activeTab]);
-
+  // --- Tarih Fonksiyonları ---
   const getMondayUTC = (date) => {
     const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     const day = utcDate.getUTCDay();
@@ -150,6 +119,7 @@ export default function TopBooksScreen({ navigation }) {
     return sunday;
   };
 
+  // --- Modallar ---
   const openBookModal = (book) => {
     setSelectedBook(book);
     setBookModalVisible(true);
@@ -170,25 +140,125 @@ export default function TopBooksScreen({ navigation }) {
 
   const addToFavorites = (book) => {
     if (isFavorite(book)) {
-      // Eğer kitap zaten favorilerdeyse modal göster
       showAlert('Bilgi', 'Bu kitap zaten favorilerinizde.');
       return;
     }
-    if (favorites.length >= 15) {
+    if ((favorites || []).length >= 15) {
       showAlert('Uyarı', 'En fazla 15 favori kitap ekleyebilirsiniz.');
       return;
     }
-    // Kitap favorilerde değilse ekle
     addFavorite(book);
     showAlert('Başarılı', `"${book.title}" favorilere eklendi.`);
   };
 
+  // --- Firestore Sorguları ---
+  const chunkArray = (arr, size) => {
+    const result = [];
+    for (let i = 0; i < arr.length; i += size) {
+      result.push(arr.slice(i, i + size));
+    }
+    return result;
+  };
+
+  const fetchSpecialBooks = async () => {
+    try {
+      const specialDocRef = doc(db, 'specialBooks', 'book');
+      const specialSnap = await getDoc(specialDocRef);
+
+      let specialBooks = [];
+      if (specialSnap.exists()) {
+        const data = specialSnap.data(); // {1: 'isbn1', 2: 'isbn2', 3: 'isbn3'}
+
+        // ISBN numaralarını field sırasına göre al
+        const isbnKeys = Object.keys(data).sort((a, b) => Number(a) - Number(b)); // ['1','2','3']
+        const isbnArray = isbnKeys.map(key => String(data[key]));
+
+        // Firestore'dan kitapları çek
+        let booksFetched = [];
+        if (isbnArray.length > 0) {
+          const chunks = chunkArray(isbnArray, 10); // Firestore 'in' max 10
+          for (const group of chunks) {
+            const q = query(collection(db, 'books'), where('isbn', 'in', group));
+            const snap = await getDocs(q);
+            booksFetched.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })));
+          }
+        }
+
+        // Sıralama: field sırasına göre ve 1 numara sonsuz likes
+        specialBooks = isbnKeys.map((key) => {
+          const isbn = data[key];
+          const book = booksFetched.find(b => b.isbn === isbn) || {};
+          return {
+            ...book,
+            likes: key === '1' ? Infinity : (book.likes || 0),
+          };
+        });
+      }
+
+      setBooks(specialBooks);
+      setLoading(false);
+    } catch (err) {
+      console.error('Special books fetch error:', err);
+      showAlert('Hata', 'Özel kitaplar yüklenirken bir hata oluştu.');
+      setLoading(false);
+    }
+  };
+
+
+
+  useEffect(() => {
+    setLoading(true);
+
+    if (activeTab === 'special') {
+      fetchSpecialBooks();
+    } else {
+      // Haftalık ve tüm zamanlar
+      const unsubscribe = onSnapshot(
+        collection(db, 'books'),
+        (querySnapshot) => {
+          const now = new Date();
+          const monday = getMondayUTC(now);
+          const sundayEnd = getSundayEndUTC(monday);
+
+          const allBooks = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            const likesHistory = Array.isArray(data.likesHistory) ? data.likesHistory : [];
+            const weeklyLikes = likesHistory.filter(ts => {
+              const dateObj = ts?.toDate?.();
+              return dateObj && dateObj >= monday && dateObj <= sundayEnd;
+            }).length;
+
+            return { id: doc.id, ...data, weeklyLikes };
+          });
+
+          const results = activeTab === 'weekly'
+            ? allBooks.filter(b => b.weeklyLikes > 0).sort((a, b) => b.weeklyLikes - a.weeklyLikes).slice(0, 10)
+            : allBooks.filter(b => b.likes > 0).sort((a, b) => b.likes - a.likes).slice(0, 10);
+
+          setBooks(results);
+          setLoading(false);
+        },
+        (error) => {
+          console.log(error);
+          showAlert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
+          setLoading(false);
+        }
+      );
+      return () => unsubscribe();
+    }
+  }, [activeTab]);
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <LottieView source={require('../../assets/loading.json')} autoPlay loop style={{ width: 250, height: 250 }} />
+        <LottieView
+          source={require('../../assets/loading.json')}
+          autoPlay
+          loop
+          style={{ width: 250, height: 250 }}
+        />
         <Text style={{ marginTop: 10, fontSize: 16, color: theme.textSecondary }}>
-          En çok beğenilen kitaplar yükleniyor...
+          Kitaplar yükleniyor...
         </Text>
       </View>
     );
@@ -198,40 +268,52 @@ export default function TopBooksScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Tab Bar */}
       <View style={[styles.tabBar, { borderColor: theme.border }]}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'weekly' && { borderColor: theme.toggleActive }]}
-          onPress={() => setActiveTab('weekly')}
-        >
-          <Text style={[styles.tabText, { color: theme.textSecondary }, activeTab === 'weekly' && { color: theme.toggleActive, fontWeight: 'bold' }]}>
-            Haftalık
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'allTime' && { borderColor: theme.toggleActive }]}
-          onPress={() => setActiveTab('allTime')}
-        >
-          <Text style={[styles.tabText, { color: theme.textSecondary }, activeTab === 'allTime' && { color: theme.toggleActive, fontWeight: 'bold' }]}>
-            Tüm Zamanlar
-          </Text>
-        </TouchableOpacity>
+        {['weekly', 'allTime', 'special'].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tabButton, activeTab === tab && { borderColor: theme.toggleActive }]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[
+              styles.tabText,
+              { color: theme.textSecondary },
+              activeTab === tab && { color: theme.toggleActive, fontWeight: 'bold' }
+            ]}>
+              {tab === 'weekly' ? 'Haftalık' : tab === 'allTime' ? 'Tüm Zamanlar' : 'Özel Kitaplar'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <Text style={[styles.header, { color: theme.textPrimary }]}>
         {activeTab === 'weekly'
           ? 'Haftanın En Çok Beğenilen Kitapları'
-          : 'Tüm Zamanların En Çok Beğenilen Kitapları'}
+          : activeTab === 'allTime'
+            ? 'Tüm Zamanların En Çok Beğenilen Kitapları'
+            : 'Swipe It Öneriyor - Özel Kitaplar'}
       </Text>
 
       <FlatList
         data={books}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => <BookCard item={item} onPress={openBookModal} onAddFavorite={addToFavorites} theme={theme} />}
+        renderItem={({ item }) => (
+          <BookCard
+            item={item}
+            onPress={openBookModal}
+            onAddFavorite={addToFavorites}
+            theme={theme}
+          />
+        )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (
           <View style={{ paddingTop: 50, alignItems: 'center' }}>
             <Text style={{ fontSize: 16, color: theme.textSecondary }}>
-              {activeTab === 'weekly' ? 'Bu hafta beğenilen kitap bulunamadı.' : 'Henüz beğenilen kitap yok.'}
+              {activeTab === 'weekly'
+                ? 'Bu hafta beğenilen kitap bulunamadı.'
+                : activeTab === 'allTime'
+                  ? 'Henüz beğenilen kitap yok.'
+                  : 'Özel kitap bulunamadı.'}
             </Text>
           </View>
         )}
@@ -245,18 +327,21 @@ export default function TopBooksScreen({ navigation }) {
               <Ionicons name="close-circle" size={32} color={theme.textSecondary} />
             </TouchableOpacity>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{selectedBook?.title}</Text>
-              <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>Yazar: {selectedBook?.author}</Text>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{selectedBook?.title || 'Başlık Bilgisi Yok'}</Text>
+              <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>Yazar: {selectedBook?.author || 'Yazar Bilgisi Yok'}</Text>
               {selectedBook?.coverImageUrl && (
                 <Image source={{ uri: selectedBook.coverImageUrl }} style={styles.modalCover} resizeMode="cover" />
               )}
               <Text style={[styles.modalDescription, { color: theme.textSecondary }]}>
-                {selectedBook?.description ?? selectedBook?.bookDescription ?? 'Açıklama bulunamadı.'}
+                {selectedBook?.description || 'Açıklama bulunamadı.'}
               </Text>
-              <TouchableOpacity style={[styles.detailButton, { backgroundColor: theme.toggleActive }]} onPress={() => {
-                setBookModalVisible(false);
-                navigation.navigate('DetailScreen', { book: selectedBook });
-              }}>
+              <TouchableOpacity
+                style={[styles.detailButton, { backgroundColor: theme.toggleActive }]}
+                onPress={() => {
+                  setBookModalVisible(false);
+                  navigation.navigate('DetailScreen', { book: selectedBook });
+                }}
+              >
                 <Text style={styles.detailButtonText}>Yorumlar & Alıntılar</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -265,18 +350,24 @@ export default function TopBooksScreen({ navigation }) {
       </Modal>
 
       {/* Alert Modal */}
-      <CustomAlertModal visible={alertVisible} title={alertTitle} message={alertMessage} onClose={hideAlert} theme={theme} />
+      <CustomAlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={hideAlert}
+        theme={theme}
+      />
     </View>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
-  // Sadece yapısal stiller, renkler theme ile veriliyor
   container: { flex: 1, paddingTop: SCREEN_HEIGHT * 0.06, paddingHorizontal: SCREEN_WIDTH * 0.05 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   tabBar: { flexDirection: 'row', justifyContent: 'center', marginBottom: 15, borderBottomWidth: 1 },
   tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2 },
-  tabText: { fontSize: 16 },
+  tabText: { fontSize: SCREEN_WIDTH * 0.04, justifyContent: 'center' },
   header: { fontSize: SCREEN_WIDTH * 0.06, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   list: { paddingBottom: 30 },
   card: { flexDirection: 'row', borderRadius: 12, marginBottom: 12, overflow: 'hidden', elevation: 2, alignItems: 'center', padding: SCREEN_WIDTH * 0.03, position: 'relative' },

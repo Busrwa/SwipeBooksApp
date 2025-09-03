@@ -57,7 +57,7 @@ function ErrorModal({ visible, message, onClose, theme }) {
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={[styles.modalBackground]}>
         <View style={[styles.errorModalContainer, { backgroundColor: theme.background }]}>
-          <Text style={[styles.errorModalTitle, { color: theme.errorBackground }]}>Hata</Text>
+          <Text style={[styles.errorModalTitle, { color: theme.errorBackground }]}>Uyarı</Text>
           <Text style={[styles.errorModalMessage, { color: theme.textPrimary }]}>{message}</Text>
           <Pressable style={[styles.errorModalButton, { backgroundColor: theme.errorBackground }]} onPress={onClose}>
             <Text style={styles.errorModalButtonText}>Tamam</Text>
@@ -108,6 +108,12 @@ export default function DetailScreen({ route, navigation }) {
 
   const [buttonsTempDisabled, setButtonsTempDisabled] = useState(false);
 
+  const isSpecialNutuk = book.id === 'nutuk';
+
+
+  <Text style={{ marginLeft: 6, fontWeight: 'bold', color: theme.textPrimary, marginTop: 8 }}>
+    {isSpecialNutuk ? '∞' : `${likeCount} Beğeni`}
+  </Text>
 
   const showFeedback = (message) => {
     setModalMessage(message);
@@ -171,30 +177,34 @@ export default function DetailScreen({ route, navigation }) {
     setButtonsTempDisabled(true);
 
     try {
-      const bookSnap = await getDoc(bookDocRef);
-      const bookData = bookSnap.exists() ? bookSnap.data() : null;
-
-      if (hasDisliked) {
-        // dislikesHistory'den son eklenen kaydı çıkar
-        const lastDislikeTimestamp = bookData?.dislikesHistory?.[bookData.dislikesHistory.length - 1];
-        await updateDoc(bookDocRef, {
-          dislikes: increment(-1),
-          dislikesHistory: lastDislikeTimestamp ? arrayRemove(lastDislikeTimestamp) : [],
-        });
-        await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayRemove(book.id) });
-        setHasDisliked(false);
-        showFeedback('Beğenmeme geri alındı.');
-      } else if (hasLiked) {
-        showFeedback('Bu kitap için daha önce beğenme tuşuna bastınız.');
+      if (isSpecialNutuk) {
+        showFeedback('Bu eser, eleştirilmeyecek kadar değerlidir. Sadece saygıyla okunmalıdır.');
       } else {
-        const newTimestamp = Timestamp.now();
-        await updateDoc(bookDocRef, {
-          dislikes: increment(1),
-          dislikesHistory: arrayUnion(newTimestamp),
-        });
-        await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayUnion(book.id) });
-        setHasDisliked(true);
-        showFeedback('Kitabı beğenmediniz.');
+        const bookSnap = await getDoc(bookDocRef);
+        const bookData = bookSnap.exists() ? bookSnap.data() : null;
+
+        if (hasDisliked) {
+          // dislikesHistory'den son eklenen kaydı çıkar
+          const lastDislikeTimestamp = bookData?.dislikesHistory?.[bookData.dislikesHistory.length - 1];
+          await updateDoc(bookDocRef, {
+            dislikes: increment(-1),
+            dislikesHistory: lastDislikeTimestamp ? arrayRemove(lastDislikeTimestamp) : [],
+          });
+          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayRemove(book.id) });
+          setHasDisliked(false);
+          showFeedback('Beğenmeme geri alındı.');
+        } else if (hasLiked) {
+          showFeedback('Bu kitap için daha önce beğenme tuşuna bastınız.');
+        } else {
+          const newTimestamp = Timestamp.now();
+          await updateDoc(bookDocRef, {
+            dislikes: increment(1),
+            dislikesHistory: arrayUnion(newTimestamp),
+          });
+          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayUnion(book.id) });
+          setHasDisliked(true);
+          showFeedback('Kitabı beğenmediniz.');
+        }
       }
     } catch (error) {
       showFeedback('Beğenmeme sırasında hata oluştu.');
@@ -260,6 +270,22 @@ export default function DetailScreen({ route, navigation }) {
     return () => unsubscribe(); // Temizlik
   }, [bookDocRef]);
 
+  useEffect(() => {
+    if (!isSpecialNutuk) return;
+
+    const nutukDocRef = doc(db, 'specialBooks', 'nutuk');
+
+    const unsubscribe = onSnapshot(nutukDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Örneğin description ve quotes gibi alanları çekebilirsin
+        setComments([]); // Nutuk için yorum eklemeyi kapatıyoruz
+        setQuotes(data.quotes || []); // Nutuk alıntıları Firestore'dan gelir
+      }
+    });
+
+    return () => unsubscribe();
+  }, [book.id]);
 
   useEffect(() => {
     const fetchBookData = async () => {
@@ -332,7 +358,14 @@ export default function DetailScreen({ route, navigation }) {
     const trimmed = text.trim();
     if (!trimmed) return showError(`${type === 'comments' ? 'Yorum' : 'Alıntı'} boş olamaz.`);
     if (!user) return showError('Kullanıcı bilgisi alınamadı. Lütfen giriş yapınız.');
-
+    if (isSpecialNutuk) {
+      showError(
+        type === 'comments'
+          ? 'Bu kitap, tarihe ışık tutan bir başyapıttır. Yorumlar ve alıntılar yerine, her satırını dikkatle okumak en doğru yaklaşımdır.'
+          : 'Bu kitap, tarihe ışık tutan bir başyapıttır. Yorumlar ve alıntılar yerine, her satırını dikkatle okumak en doğru yaklaşımdır.'
+      );
+      return;
+    }
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const username = userDoc.exists() ? userDoc.data().username || 'Anonim' : 'Anonim';
@@ -573,7 +606,7 @@ export default function DetailScreen({ route, navigation }) {
                   style={{ marginTop: 7 }}
                 />
                 <Text style={{ marginLeft: 6, fontWeight: 'bold', color: theme.textPrimary, marginTop: 8 }}>
-                  {likeCount} Beğeni
+                  {isSpecialNutuk ? '∞ Beğeni' : `${likeCount} Beğeni`}
                 </Text>
               </View>
             </View>
@@ -610,15 +643,25 @@ export default function DetailScreen({ route, navigation }) {
                 data={(activeTab === 'comments' ? comments : quotes).slice(-10)}
                 keyExtractor={(item, index) => (item.id ? item.id.toString() : index.toString())}
                 renderItem={renderItem}
-                ListEmptyComponent={() => (
-                  <View style={{ alignItems: 'center', marginTop: 20 }}>
-                    <Text style={{ fontSize: SCREEN_WIDTH * 0.045, color: theme.textSecondary }}>
-                      {activeTab === 'comments'
-                        ? 'Henüz yorum yapılmadı.'
-                        : 'Henüz alıntı yapılmadı.'}
-                    </Text>
-                  </View>
-                )}
+                ListEmptyComponent={() => {
+                  if (book.id === 'nutuk') { // sadece Nutuk için
+                    return (
+                      <View style={{ alignItems: 'center', marginTop: 20, paddingHorizontal: 20 }}>
+                        <Text style={{ fontSize: SCREEN_WIDTH * 0.045, color: theme.textSecondary, textAlign: 'center' }}>
+                          Bu kitap, tarihe ışık tutan bir başyapıttır. Yorumlar ve alıntılar yerine, her satırını dikkatle okumak en doğru yaklaşımdır.
+                        </Text>
+                      </View>
+                    );
+                  } else {
+                    return (
+                      <View style={{ alignItems: 'center', marginTop: 20 }}>
+                        <Text style={{ fontSize: SCREEN_WIDTH * 0.045, color: theme.textSecondary }}>
+                          {activeTab === 'comments' ? 'Henüz yorum yapılmadı.' : 'Henüz alıntı yapılmadı.'}
+                        </Text>
+                      </View>
+                    );
+                  }
+                }}
                 contentContainerStyle={{
                   paddingTop: 10,
                   paddingBottom: 30,
@@ -983,6 +1026,7 @@ const styles = StyleSheet.create({
   },
   feedbackModalText: {
     fontSize: 18,
+    textAlign: 'center',
   },
   coverContainer: {
     position: 'relative',

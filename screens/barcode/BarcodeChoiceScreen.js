@@ -37,7 +37,7 @@ export default function BarcodeChoiceScreen() {
                 style={[styles.card, { backgroundColor: theme.toggleActive }]}
                 onPress={() => navigation.navigate('BarcodeScanner')}
             >
-                <Text style={styles.cardText}>Barkod ile Tara</Text>
+                <Text style={styles.cardText}>Barkod Tara</Text>
             </TouchableOpacity>
 
             {/* Manuel ISBN Girişi */}

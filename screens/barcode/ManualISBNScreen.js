@@ -12,7 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { fetchBooksFromBackend } from '../../services/booksAPI';
 import { ThemeContext } from '../../context/ThemeContext';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -54,7 +54,12 @@ export default function ManualISBNScreen() {
             const matchedBook = books.find(book => book.isbn === isbn.trim());
 
             if (matchedBook) {
-                navigation.navigate('DetailScreen', { book: matchedBook });
+                navigation.navigate('DetailScreen', {
+                    book: {
+                        ...matchedBook,
+                        createdAt: matchedBook.createdAt?.toString() || null
+                    }
+                });
             } else {
                 setModalVisible(true);
             }
@@ -66,7 +71,7 @@ export default function ManualISBNScreen() {
     };
 
 
-    return ( 
+    return (
         <KeyboardAwareScrollView
             style={{ flex: 1, backgroundColor: theme.background }}
             contentContainerStyle={{

@@ -24,6 +24,9 @@ import LottieView from 'lottie-react-native';
 import { db } from '../../services/firebase';
 import { ThemeContext } from '../../context/ThemeContext';
 
+import { arrayRemove } from 'firebase/firestore';
+
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const scale = SCREEN_WIDTH / 375; // iPhone 6/7/8 genişliği referans
 import { AuthContext } from '../../context/AuthContext';
@@ -33,7 +36,7 @@ function normalize(size) {
   return Math.round(PixelRatio.roundToNearestPixel(newSize));
 }
 
-function CustomAlertModal({ visible, title, message, onClose, theme }) {
+function CustomAlertModal({ visible, title, message, onClose, theme, onUndo }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={{
@@ -57,18 +60,29 @@ function CustomAlertModal({ visible, title, message, onClose, theme }) {
           <Text style={{ fontSize: SCREEN_WIDTH * 0.045, textAlign: 'center', marginBottom: 25, lineHeight: SCREEN_WIDTH * 0.06, color: theme.textSecondary }}>
             {message}
           </Text>
-          <TouchableOpacity
-            onPress={onClose}
-            style={{ paddingVertical: 12, paddingHorizontal: 40, borderRadius: 25, backgroundColor: theme.toggleActive }}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: SCREEN_WIDTH * 0.045 }}>Tamam</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={{ paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, backgroundColor: theme.toggleActive, marginRight: 10 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: SCREEN_WIDTH * 0.045 }}>Tamam</Text>
+            </TouchableOpacity>
+
+            {onUndo && (
+              <TouchableOpacity
+                onPress={onUndo}
+                style={{ paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, backgroundColor: 'gray' }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: SCREEN_WIDTH * 0.045 }}>Geri Al</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
-
   );
 }
+
 
 const cleanDocId = (title) => {
   if (!title) return 'unknown';
@@ -84,6 +98,9 @@ export default function SwipeScreen({ navigation }) {
     ? require('../../assets/logo_beyaz.png')
     : require('../../assets/logo_siyah.png');
 
+  const [hasLiked, setHasLiked] = useState(false);
+  const [hasDisliked, setHasDisliked] = useState(false);
+
   const [books, setBooks] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -98,17 +115,70 @@ export default function SwipeScreen({ navigation }) {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const showAlert = (title, message) => {
+  const showAlert = (title, message, onUndo = null) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertVisible(true);
+    setAlertUndo(() => onUndo); // Yeni state: alertUndo
   };
-
-  const hideAlert = () => setAlertVisible(false);
+  const [alertUndo, setAlertUndo] = useState(null);
+  const hideAlert = () => {
+    setAlertVisible(false);
+    setAlertUndo(null);
+  };
 
   const { user } = useContext(AuthContext);
 
-  const currentBook = books[currentIndex] || null;
+  const currentBook = books.length > 0 ? books[currentIndex % books.length] : null;
+
+  const handleUndoLike = async () => {
+    if (!currentBook || !user) return;
+
+    const bookId = cleanDocId(currentBook.title);
+    await updateDoc(doc(db, "users", user.uid), {
+      likedBooks: arrayRemove(bookId)
+    });
+
+    // Score’u geri azalt
+    await updateBookScore(currentBook, "likes", -1);
+    setHasLiked(false);
+    hideAlert();
+  };
+
+  const handleUndoDislike = async () => {
+    if (!currentBook || !user) return;
+
+    const bookId = cleanDocId(currentBook.title);
+    await updateDoc(doc(db, "users", user.uid), {
+      dislikedBooks: arrayRemove(bookId)
+    });
+
+    await updateBookScore(currentBook, "dislikes", -1);
+    setHasDisliked(false);
+    hideAlert();
+  };
+
+
+  useEffect(() => {
+    if (!user || !currentBook) return;
+
+    const fetchUserLikes = async () => {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        // her kitap değişiminde güncelle
+        const bookId = cleanDocId(currentBook.title);
+        setHasLiked(data.likedBooks?.includes(bookId) || false);
+        setHasDisliked(data.dislikedBooks?.includes(bookId) || false);
+      } else {
+        setHasLiked(false);
+        setHasDisliked(false);
+      }
+    };
+    fetchUserLikes();
+  }, [user, currentBook?.title]); // currentBook değiştiğinde çalışacak
+
+
 
   useEffect(() => {
     const loadBooksAndIndex = async () => {
@@ -143,6 +213,11 @@ export default function SwipeScreen({ navigation }) {
         const userDocRef = doc(db, 'users', user.uid);
         updateDoc(userDocRef, { lastViewedBookIndex: nextIndex }).catch(console.error);
       }
+      // Yeni kitap geldiğinde butonları aktif et
+      setButtonsDisabled(false);
+      setHasLiked(false);
+      setHasDisliked(false);
+
 
       return nextIndex;
     });
@@ -161,6 +236,7 @@ export default function SwipeScreen({ navigation }) {
         author: book.author || 'Bilinmiyor',
         coverImageUrl: book.coverImageUrl || null,
         description: book.description || '',
+        isbn: book.isbn || null,
       };
 
       if (docSnap.exists()) {
@@ -194,8 +270,23 @@ export default function SwipeScreen({ navigation }) {
 
   const handleThumbsUp = async () => {
     if (buttonsDisabled) return; // Eğer devre dışı ise hiçbir şey yapma
+    if (hasLiked) {
+      showAlert("Bilgi", "Bu kitabı zaten beğendiniz.", handleUndoLike);
+      return;
+    }
+    if (hasDisliked) {
+      showAlert("Bilgi", "Bu kitap için daha önce beğenmeme tuşuna bastınız.", handleUndoDislike);
+      return;
+    }
+
     setButtonsDisabled(true); // Diğer butonları devre dışı bırak
-    if (currentBook) await updateBookScore(currentBook, 'likes', 1);
+    if (currentBook) {
+      await updateBookScore(currentBook, "likes", 1);
+      await updateDoc(doc(db, "users", user.uid), {
+        likedBooks: arrayUnion(cleanDocId(currentBook.title)),
+      });
+      setHasLiked(true);
+    }
     Animated.timing(position, {
       toValue: { x: 500, y: 0 },
       duration: 400,
@@ -203,16 +294,29 @@ export default function SwipeScreen({ navigation }) {
     }).start(() => {
       position.setValue({ x: 0, y: 0 });
       showNextBook();
-      setButtonsDisabled(false); // Yeni kitap geldiğinde butonları tekrar aktif et
-
+      setButtonsDisabled(false);
     });
   };
 
   const handleDislike = async () => {
     if (buttonsDisabled) return;
+    if (hasDisliked) {
+      showAlert("Bilgi", "Bu kitabı zaten beğenmediniz.", handleUndoDislike);
+      return;
+    }
+    if (hasLiked) {
+      showAlert("Bilgi", "Bu kitap için daha önce beğenme tuşuna bastınız.", handleUndoLike);
+      return;
+    }
     setButtonsDisabled(true);
 
-    if (currentBook) await updateBookScore(currentBook, 'dislikes', 1);
+    if (currentBook) {
+      await updateBookScore(currentBook, "dislikes", 1);
+      await updateDoc(doc(db, "users", user.uid), {
+        dislikedBooks: arrayUnion(currentBook.title),
+      });
+      setHasDisliked(true);
+    }
     Animated.timing(position, {
       toValue: { x: -500, y: 0 },
       duration: 400,
@@ -493,17 +597,34 @@ export default function SwipeScreen({ navigation }) {
       </View>
 
       <View style={styles.cardContainer}>
-        <Animated.View
-          style={[styles.card, { transform: position.getTranslateTransform() }]}
-          {...panResponder.panHandlers}
-        >
-          {currentBook.coverImageUrl ? (
-            <Image source={{ uri: currentBook.coverImageUrl }} style={styles.cover} resizeMode="cover" />
-          ) : (
-            <Image source={require('../../assets/swipeitlogo.png')} style={styles.cover} resizeMode="cover" />
-          )}
-        </Animated.View>
+        {/* Arkada sabit duran bir sonraki kitap */}
+        {books.length > 0 && books[(currentIndex + 1) % books.length] && (
+          <View style={[styles.card, { position: 'absolute' }]}>
+            <Image
+              source={
+                books[(currentIndex + 1) % books.length].coverImageUrl
+                  ? { uri: books[(currentIndex + 1) % books.length].coverImageUrl }
+                  : require('../../assets/swipeitlogo.png')
+              }
+              style={styles.cover}
+              resizeMode="cover"
+            />
+          </View>
+        )}
 
+        {/* Öndeki, animasyonla kayacak olan mevcut kitap */}
+        {currentBook && (
+          <Animated.View
+            style={[styles.card, { transform: position.getTranslateTransform() }]}
+            {...panResponder.panHandlers}
+          >
+            {currentBook.coverImageUrl ? (
+              <Image source={{ uri: currentBook.coverImageUrl }} style={styles.cover} resizeMode="cover" />
+            ) : (
+              <Image source={require('../../assets/swipeitlogo.png')} style={styles.cover} resizeMode="cover" />
+            )}
+          </Animated.View>
+        )}
         <TouchableOpacity onPress={handleReportPress} style={styles.reportButton}>
           <Ionicons name="alert-circle-outline" size={28} color={theme.errorBackground} />
         </TouchableOpacity>
@@ -511,13 +632,13 @@ export default function SwipeScreen({ navigation }) {
 
       <View style={styles.swipeButtons}>
         <TouchableOpacity onPress={handleDislike} style={styles.swipeButton} disabled={buttonsDisabled}>
-          <Octicons name="thumbsdown" size={30} color={theme.errorBackground} />
+          <Octicons name="thumbsdown" size={30} color={hasDisliked ? "red" : theme.errorBackground} />
         </TouchableOpacity>
         <TouchableOpacity onPress={handleAddFavorite} style={styles.swipeButton} disabled={buttonsDisabled}>
           <Ionicons name="heart-outline" size={30} color={theme.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity onPress={handleThumbsUp} style={styles.swipeButton} disabled={buttonsDisabled}>
-          <Octicons name="thumbsup" size={30} color={theme.successBackground} />
+          <Octicons name="thumbsup" size={30} color={hasLiked ? "green" : theme.successBackground} />
         </TouchableOpacity>
       </View>
 
@@ -569,6 +690,7 @@ export default function SwipeScreen({ navigation }) {
         message={alertMessage}
         onClose={hideAlert}
         theme={theme}
+        onUndo={alertUndo}
       />
 
       {/* Başlık Modalı */}

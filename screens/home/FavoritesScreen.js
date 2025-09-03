@@ -220,7 +220,7 @@ export default function FavoriteScreen({ navigation }) {
             if (!selectedBook) return;
 
             const safeBook = {
-              id: selectedBook.id || selectedBook.title || 'unknown',
+              id: selectedBook.id || selectedBook.title.toLowerCase() === 'nutuk' ? 'nutuk' : selectedBook.title,
               title: selectedBook.title || '',
               author: selectedBook.author || '',
               description: selectedBook.description || '',
@@ -235,13 +235,14 @@ export default function FavoriteScreen({ navigation }) {
               isFavorite: true,
             };
 
-            navigation.navigate('DetailScreen', { book: safeBook });
+            // Nutuk kitabıysa özel parametre gönder
+            const isspecialnutuk = selectedBook.title === 'Nutuk';
+
+            navigation.navigate('DetailScreen', { book: safeBook, isspecialnutuk });
           },
           style: styles.detailButton,
           textStyle: styles.detailButtonText,
         }]}
-
-
         theme={theme}
       >
         <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>Yazar: {selectedBook?.author}</Text>
