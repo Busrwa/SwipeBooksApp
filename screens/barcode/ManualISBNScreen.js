@@ -13,8 +13,20 @@ import { fetchBooksFromBackend } from '../../services/booksAPI';
 import { ThemeContext } from '../../context/ThemeContext';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../services/firebase";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const fetchBookFromFirestore = async (isbn) => {
+    const q = query(collection(db, "books"), where("isbn", "==", isbn));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+        const docData = snapshot.docs[0].data();
+        return { id: snapshot.docs[0].id, ...docData };
+    }
+    return null;
+};
 
 export default function ManualISBNScreen() {
     const { theme } = useContext(ThemeContext);
@@ -34,6 +46,8 @@ export default function ManualISBNScreen() {
 
     const isValidISBN = (value) => /^[0-9]{10,13}$/.test(value);
 
+    const NUTUK_ISBN = "9789944888349";
+
     const handleSearch = async () => {
         setErrorMessage('');
 
@@ -49,16 +63,38 @@ export default function ManualISBNScreen() {
 
         setLoading(true);
 
+        // 30 saniye timeout
+        const timeoutId = setTimeout(() => {
+            setLoading(false);
+            setModalVisible(true);
+            setErrorMessage("Lütfen daha sonra tekrar deneyiniz.");
+            setTimeout(() => {
+                setModalVisible(false);
+                navigation.goBack();
+            }, 2000);
+        }, 30000);
+
         try {
-            const books = await fetchBooksFromBackend();
-            const matchedBook = books.find(book => book.isbn === isbn.trim());
+            let matchedBook = null;
+
+            if (isbn.trim() === NUTUK_ISBN) {
+                // Nutuk için Firestore’dan ara
+                matchedBook = await fetchBookFromFirestore(NUTUK_ISBN);
+            } else {
+                // Diğer ISBN’ler backend’den
+                const books = await fetchBooksFromBackend();
+                matchedBook = books.find(book => book.isbn === isbn.trim());
+            }
+
+            clearTimeout(timeoutId);
 
             if (matchedBook) {
                 navigation.navigate('DetailScreen', {
                     book: {
                         ...matchedBook,
-                        createdAt: matchedBook.createdAt?.toString() || null
-                    }
+                        createdAt: matchedBook.createdAt?.toString() || new Date().toISOString(),
+                    },
+                    isspecialnutuk: isbn.trim() === NUTUK_ISBN,
                 });
             } else {
                 setModalVisible(true);
