@@ -92,7 +92,6 @@ export default function LoginScreen({ navigation }) {
         email: user.email,
         username: userData.username || 'Anonim',
         avatarIndex: userData.avatarIndex || 0,
-        emailVerified: true,
       });
 
       // "Beni Hatırla" işlemi

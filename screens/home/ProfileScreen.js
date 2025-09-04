@@ -42,6 +42,15 @@ export default function ProfileScreen() {
     require('../../assets/avatars/avatar2.png'),
     require('../../assets/avatars/avatar3.png'),
     require('../../assets/avatars/avatar4.png'),
+    require('../../assets/avatars/avatar6.png'),
+    require('../../assets/avatars/avatar7.png'),
+    require('../../assets/avatars/avatar8.png'),
+    require('../../assets/avatars/avatar9.png'),
+    require('../../assets/avatars/avatar10.png'),
+    require('../../assets/avatars/avatar11.png'),
+    require('../../assets/avatars/avatar12.png'),
+    require('../../assets/avatars/avatar13.png'),
+    require('../../assets/avatars/avatar14.png'),
   ];
 
   const auth = getAuth();
