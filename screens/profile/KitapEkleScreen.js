@@ -82,7 +82,7 @@ export default function KitapEkleScreen() {
       setDescription('');
     } catch (error) {
       showModal('Kitap önerisi gönderilemedi. Lütfen tekrar deneyiniz.');
-      console.error('Kitap önerisi hata:', error);
+      logError('Kitap önerisi hata:', error);
     }
   };
 

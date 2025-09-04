@@ -74,7 +74,7 @@ export default function ProfileScreen() {
           }
         }
       } catch (error) {
-        console.error('Firestore hatası:', error);
+        logError('Firestore hatası:', error);
       }
     };
 
@@ -101,7 +101,7 @@ export default function ProfileScreen() {
       showMessage('Şifre sıfırlama maili gönderildi. Lütfen e-postanızı kontrol edin.', 'success');
     } catch (error) {
       setLoading(false);
-      console.error('Şifre sıfırlama hatası:', error);
+      logError('Şifre sıfırlama hatası:', error);
       showMessage('Hata: ' + error.message, 'error');
     }
   };
@@ -114,7 +114,7 @@ export default function ProfileScreen() {
       setSelectedAvatarIndex(index);
       showMessage('Profil resmi başarıyla güncellendi.', 'success');
     } catch (error) {
-      console.error('Avatar kaydetme hatası:', error);
+      logError('Avatar kaydetme hatası:', error);
       showMessage('Profil resmi güncellenirken hata oluştu: ' + error.message, 'error');
     }
   };

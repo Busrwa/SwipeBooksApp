@@ -198,7 +198,7 @@ export default function TopBooksScreen({ navigation }) {
       setBooks(specialBooks);
       setLoading(false);
     } catch (err) {
-      console.error('Special books fetch error:', err);
+      logError('Special books fetch error:', err);
       showAlert('Hata', 'Özel kitaplar yüklenirken bir hata oluştu.');
       setLoading(false);
     }
@@ -243,7 +243,7 @@ export default function TopBooksScreen({ navigation }) {
 
         setBooks(results);
       } catch (err) {
-        console.error(err);
+        logError(err);
         showAlert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
       } finally {
         setLoading(false);

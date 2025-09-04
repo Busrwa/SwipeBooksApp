@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
           setUser(JSON.parse(savedUser));
         }
       } catch (error) {
-        console.log('AsyncStorage kullanıcı yükleme hatası:', error);
+        logError('Kullanıcı yükleme hatası:', error);
       } finally {
         setLoading(false);
       }

@@ -109,7 +109,7 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.removeItem('rememberedUser');
       }
 
-      console.log('Giriş yapan kullanıcı:', userData.username || 'Anonim');
+      logInfo('Giriş yapan kullanıcı:', userData.username || 'Anonim');
       navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
 
     } catch (error) {

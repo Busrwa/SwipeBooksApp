@@ -32,7 +32,9 @@ export const FavoritesProvider = ({ children }) => {
           setLikedBooks([]);
         }
       } catch (error) {
-        console.error('Veriler alınırken hata:', error);
+        logError('Veriler alınırken hata:', error);
+
+        alert('Bir hata oluştu, lütfen tekrar deneyin.');
       }
     };
 
@@ -56,7 +58,7 @@ export const FavoritesProvider = ({ children }) => {
   const addFavorite = async (book) => {
     if (!user) return;
     if (favorites.length >= 15) {
-      console.warn('En fazla 15 favori kitap eklenebilir.');
+        logWarning('En fazla 15 favori kitap eklenebilir.');
       return;
     }
 
@@ -80,7 +82,7 @@ export const FavoritesProvider = ({ children }) => {
       const docRef = doc(db, 'users', user.uid);
       await updateDoc(docRef, { favorites: arrayUnion(clean) });
     } catch (error) {
-      console.error('Favori eklenirken hata:', error);
+      logError('Favori eklenirken hata:', error);
     }
   };
 
@@ -96,7 +98,7 @@ export const FavoritesProvider = ({ children }) => {
       const docRef = doc(db, 'users', user.uid);
       await updateDoc(docRef, { favorites: arrayRemove(clean) });
     } catch (error) {
-      console.error('Favori çıkarılırken hata:', error);
+      logError('Favori çıkarılırken hata:', error);
     }
   };
 
@@ -107,7 +109,7 @@ export const FavoritesProvider = ({ children }) => {
       const docRef = doc(db, 'users', user.uid);
       await updateDoc(docRef, { favorites: [] });
     } catch (error) {
-      console.error('Tüm favoriler silinirken hata:', error);
+      logError('Tüm favoriler silinirken hata:', error);
     }
   };
 
@@ -124,7 +126,7 @@ export const FavoritesProvider = ({ children }) => {
       const docRef = doc(db, 'users', user.uid);
       await updateDoc(docRef, { likedBooks: arrayUnion(clean) });
     } catch (error) {
-      console.error('Beğenilen kitap eklenirken hata:', error);
+      logError('Beğenilen kitap eklenirken hata:', error);
     }
   };
 
@@ -140,7 +142,7 @@ export const FavoritesProvider = ({ children }) => {
       const docRef = doc(db, 'users', user.uid);
       await updateDoc(docRef, { likedBooks: arrayRemove(clean) });
     } catch (error) {
-      console.error('Beğenilen kitap çıkarılırken hata:', error);
+      logError('Beğenilen kitap çıkarılırken hata:', error);
     }
   };
 

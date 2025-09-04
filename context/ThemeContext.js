@@ -53,7 +53,7 @@ export const ThemeProvider = ({ children }) => {
           setDarkMode(JSON.parse(saved));
         }
       } catch (e) {
-        console.log('Tema yüklenirken hata:', e);
+        logError('Tema yüklenirken hata:', e);
       }
     })();
   }, []);

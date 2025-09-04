@@ -141,7 +141,7 @@ export default function RegisterScreen() {
       try {
         await sendEmailVerification(user);
       } catch (verifyError) {
-        console.error("Doğrulama e-postası gönderilemedi:", verifyError);
+        logError("Doğrulama e-postası gönderilemedi:", verifyError);
         showModal('Uyarı', 'Kayıt başarılı oldu fakat doğrulama e-postası gönderilemedi. Lütfen daha sonra tekrar deneyin.');
       }
 
@@ -161,7 +161,7 @@ export default function RegisterScreen() {
 
       setLoading(false);
     } catch (error) {
-      console.error(error);
+      logError('Kayıt sırasında hata:', error);
       let message = 'Bilinmeyen bir hata oluştu. Lütfen tekrar deneyin.';
       if (error.code === 'auth/email-already-in-use') {
         message = 'Bu e-posta zaten kayıtlı.';

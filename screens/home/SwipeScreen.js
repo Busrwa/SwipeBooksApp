@@ -211,8 +211,11 @@ export default function SwipeScreen({ navigation }) {
       // Firestore'a kullanıcı için son görülen kitap indeksini kaydet
       if (user?.uid) {
         const userDocRef = doc(db, 'users', user.uid);
-        updateDoc(userDocRef, { lastViewedBookIndex: nextIndex }).catch(console.error);
+        updateDoc(userDocRef, { lastViewedBookIndex: nextIndex }).catch((error) => {
+          logError('Firestore güncelleme hatası (lastViewedBookIndex):', error);
+        });
       }
+
       // Yeni kitap geldiğinde butonları aktif et
       setButtonsDisabled(false);
       setHasLiked(false);
@@ -264,7 +267,7 @@ export default function SwipeScreen({ navigation }) {
         await setDoc(bookDocRef, newData);
       }
     } catch (error) {
-      console.error('Firestore update error:', error);
+      logError('Firestore update error:', error);
     }
   };
 
