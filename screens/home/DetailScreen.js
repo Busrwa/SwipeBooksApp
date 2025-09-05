@@ -142,7 +142,7 @@ export default function DetailScreen({ route, navigation }) {
           likes: increment(-1),
           likesHistory: lastLikeTimestamp ? arrayRemove(lastLikeTimestamp) : [],
         });
-        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayRemove(book.id) });
+        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayRemove(docId) });
         setHasLiked(false);
         showFeedback('Beğeniyi geri aldınız.');
       } else if (hasDisliked) {
@@ -153,7 +153,7 @@ export default function DetailScreen({ route, navigation }) {
           likes: increment(1),
           likesHistory: arrayUnion(newTimestamp),
         });
-        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayUnion(book.id) });
+        await updateDoc(doc(db, 'users', user.uid), { likedBooks: arrayUnion(docId) });
         setHasLiked(true);
         showFeedback('Kitabı beğendiniz!');
       }
@@ -190,7 +190,7 @@ export default function DetailScreen({ route, navigation }) {
             dislikes: increment(-1),
             dislikesHistory: lastDislikeTimestamp ? arrayRemove(lastDislikeTimestamp) : [],
           });
-          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayRemove(book.id) });
+          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayRemove(docId) });
           setHasDisliked(false);
           showFeedback('Beğenmeme geri alındı.');
         } else if (hasLiked) {
@@ -201,7 +201,7 @@ export default function DetailScreen({ route, navigation }) {
             dislikes: increment(1),
             dislikesHistory: arrayUnion(newTimestamp),
           });
-          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayUnion(book.id) });
+          await updateDoc(doc(db, 'users', user.uid), { dislikedBooks: arrayUnion(docId) });
           setHasDisliked(true);
           showFeedback('Kitabı beğenmediniz.');
         }
@@ -337,16 +337,23 @@ export default function DetailScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!user) return;
-    const fetchUserLikes = async () => {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+    const userRef = doc(db, 'users', user.uid);
+
+    const unsubscribe = onSnapshot(userRef, (userDoc) => {
       if (userDoc.exists()) {
         const data = userDoc.data();
-        setHasLiked(data.likedBooks?.includes(book.id) || false);
-        setHasDisliked(data.dislikedBooks?.includes(book.id) || false);
+        setHasLiked(data.likedBooks?.includes(docId) || false);
+        setHasDisliked(data.dislikedBooks?.includes(docId) || false);
+      } else {
+        setHasLiked(false);
+        setHasDisliked(false);
       }
-    };
-    fetchUserLikes();
-  }, [user, book.id]);
+    });
+
+    return () => unsubscribe(); // temizlik
+  }, [user, docId]);
+
 
 
   const showError = (msg) => {

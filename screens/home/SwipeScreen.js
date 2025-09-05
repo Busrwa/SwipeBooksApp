@@ -15,6 +15,7 @@ import {
   Dimensions,
   PixelRatio,
 } from 'react-native';
+import { onSnapshot } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
 import { FavoritesContext } from '../../context/FavoritesContext';
@@ -162,21 +163,22 @@ export default function SwipeScreen({ navigation }) {
   useEffect(() => {
     if (!user || !currentBook) return;
 
-    const fetchUserLikes = async () => {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        // her kitap değişiminde güncelle
-        const bookId = cleanDocId(currentBook.title);
+    const userRef = doc(db, "users", user.uid);
+    const bookId = cleanDocId(currentBook.title);
+
+    const unsubscribe = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
         setHasLiked(data.likedBooks?.includes(bookId) || false);
         setHasDisliked(data.dislikedBooks?.includes(bookId) || false);
       } else {
         setHasLiked(false);
         setHasDisliked(false);
       }
-    };
-    fetchUserLikes();
-  }, [user, currentBook?.title]); // currentBook değiştiğinde çalışacak
+    });
+
+    return () => unsubscribe();
+  }, [user, currentBook?.title]);
 
 
 
@@ -185,10 +187,8 @@ export default function SwipeScreen({ navigation }) {
       setLoading(true);
       const bookList = await fetchBooksFromBackend();
 
-      // Random sıralamayı kaldır, veritabanından geldiği sırayla kullan
       setBooks(bookList);
 
-      // Kullanıcının kaldığı yeri Firestore'dan al
       if (user?.uid) {
         const userDocRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
@@ -316,7 +316,7 @@ export default function SwipeScreen({ navigation }) {
     if (currentBook) {
       await updateBookScore(currentBook, "dislikes", 1);
       await updateDoc(doc(db, "users", user.uid), {
-        dislikedBooks: arrayUnion(currentBook.title),
+        dislikedBooks: arrayUnion(cleanDocId(currentBook.title)),
       });
       setHasDisliked(true);
     }
