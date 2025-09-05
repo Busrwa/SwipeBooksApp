@@ -29,13 +29,14 @@ import { arrayRemove } from 'firebase/firestore';
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const scale = SCREEN_WIDTH / 375; // iPhone 6/7/8 genişliği referans
+const scale = SCREEN_WIDTH / 375; 
 import { AuthContext } from '../../context/AuthContext';
 
 function normalize(size) {
   const newSize = size * scale;
   return Math.round(PixelRatio.roundToNearestPixel(newSize));
 }
+
 
 function CustomAlertModal({ visible, title, message, onClose, theme, onUndo }) {
   return (

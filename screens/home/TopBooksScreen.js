@@ -20,24 +20,43 @@ import { ThemeContext } from '../../context/ThemeContext';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // --- Özel Alert Modal ---
-function CustomAlertModal({ visible, title, message, onClose, theme }) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.customModalBackground}>
-        <View style={[styles.customModalContainer, { backgroundColor: theme.background }]}>
-          <Text style={[styles.alertTitle, { color: theme.textPrimary }]}>{title}</Text>
-          <Text style={[styles.alertMessage, { color: theme.textSecondary }]}>{message}</Text>
-          <TouchableOpacity
-            style={[styles.alertButton, { backgroundColor: theme.toggleActive }]}
-            onPress={onClose}
-          >
-            <Text style={styles.alertButtonText}>Tamam</Text>
-          </TouchableOpacity>
-        </View>
+
+
+const CustomModal = ({ visible, onClose, title, children, buttons, theme }) => (
+  <Modal
+    visible={visible}
+    animationType="slide"
+    transparent={true}
+    onRequestClose={onClose}
+  >
+    <View style={styles.customModalBackground}>
+      <View style={[styles.customModalContainer, { backgroundColor: theme.background }]}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={styles.modalCloseButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="close" size={32} color={theme.textSecondary} />
+        </TouchableOpacity>
+        {title ? <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{title}</Text> : null}
+        <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+          {children}
+        </ScrollView>
+        {buttons && (
+          <View style={{ marginTop: 10 }}>
+            {buttons.map(({ text, onPress, style, textStyle }, i) => (
+              <TouchableOpacity key={i} onPress={onPress} style={[styles.detailButton, style]}>
+                <Text style={[styles.detailButtonText, textStyle]}>{text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
-    </Modal>
-  );
-}
+    </View>
+  </Modal>
+);
+
+
 
 // --- Kitap Kartı ---
 const BookCard = memo(({ item, onPress, onAddFavorite, theme }) => {
@@ -322,43 +341,51 @@ export default function TopBooksScreen({ navigation }) {
 
 
       {/* Book Modal */}
-      <Modal visible={bookModalVisible} animationType="fade" transparent onRequestClose={closeBookModal}>
-        <View style={styles.customModalBackground}>
-          <View style={[styles.customModalContainer, { backgroundColor: theme.background }]}>
-            <TouchableOpacity onPress={closeBookModal} style={styles.modalCloseButton}>
-              <Ionicons name="close-circle" size={32} color={theme.textSecondary} />
-            </TouchableOpacity>
-            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{selectedBook?.title || 'Başlık Bilgisi Yok'}</Text>
-              <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>Yazar: {selectedBook?.author || 'Yazar Bilgisi Yok'}</Text>
-              {selectedBook?.coverImageUrl && (
-                <Image source={{ uri: selectedBook.coverImageUrl }} style={styles.modalCover} resizeMode="cover" />
-              )}
-              <Text style={[styles.modalDescription, { color: theme.textSecondary }]}>
-                {selectedBook?.description || 'Açıklama bulunamadı.'}
-              </Text>
-              <TouchableOpacity
-                style={[styles.detailButton, { backgroundColor: theme.toggleActive }]}
-                onPress={() => {
-                  setBookModalVisible(false);
-                  navigation.navigate('DetailScreen', { book: selectedBook });
-                }}
-              >
-                <Text style={styles.detailButtonText}>Yorumlar & Alıntılar</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <CustomModal
+        visible={bookModalVisible}
+        onClose={closeBookModal}
+        title={selectedBook?.title}
+        theme={theme}
+        buttons={[{
+          text: 'Yorumlar & Alıntılar',
+          onPress: () => {
+            setBookModalVisible(false);
+            navigation.navigate('DetailScreen', { book: selectedBook });
+          },
+          style: { backgroundColor: theme.toggleActive },
+          textStyle: { color: '#fff' }
+        }]}
+      >
+        <Text style={[styles.modalAuthor, { color: theme.textSecondary }]}>
+          Yazar: {selectedBook?.author || 'Yazar Bilgisi Yok'}
+        </Text>
+        {selectedBook?.coverImageUrl && (
+          <Image source={{ uri: selectedBook.coverImageUrl }} style={styles.modalCover} resizeMode="cover" />
+        )}
+        <Text style={[styles.modalDescription, { color: theme.textSecondary }]}>
+          {selectedBook?.description || 'Açıklama bulunamadı.'}
+        </Text>
+      </CustomModal>
+
 
       {/* Alert Modal */}
-      <CustomAlertModal
+      <CustomModal
         visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
         onClose={hideAlert}
+        title={alertTitle}
         theme={theme}
-      />
+        buttons={[{
+          text: 'Tamam',
+          onPress: hideAlert,
+          style: { backgroundColor: theme.toggleActive },
+          textStyle: { color: '#fff' }
+        }]}
+      >
+        <Text style={[styles.modalDescription, { color: theme.textSecondary, textAlign: 'center' }]}>
+          {alertMessage}
+        </Text>
+      </CustomModal>
+
     </View>
   );
 }
