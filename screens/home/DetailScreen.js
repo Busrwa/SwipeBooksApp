@@ -15,6 +15,7 @@ import {
   Pressable,
   ScrollView,
   Keyboard,
+  Share,
 } from 'react-native';
 import { FavoritesContext } from '../../context/FavoritesContext';
 import { doc, getDoc, updateDoc, arrayUnion, setDoc, Timestamp, increment, arrayRemove, onSnapshot } from 'firebase/firestore';
@@ -109,6 +110,16 @@ export default function DetailScreen({ route, navigation }) {
   const [buttonsTempDisabled, setButtonsTempDisabled] = useState(false);
 
   const isSpecialNutuk = book.id === 'nutuk';
+
+  const handleShare = async () => {
+    if (!book) return showFeedback('Kitap bilgisi bulunamadı.');
+    try {
+      const message = `📚 Kitap: "${book.title}"\n✍ Yazar: ${book.author}`;
+      await Share.share({ message });
+    } catch (error) {
+      showFeedback('Paylaşım başarısız oldu.');
+    }
+  };
 
 
   <Text style={{ marginLeft: 6, fontWeight: 'bold', color: theme.textPrimary, marginTop: 8 }}>
@@ -604,17 +615,37 @@ export default function DetailScreen({ route, navigation }) {
                 >
                   <Ionicons name="heart" size={22} color="#d60056" />
                 </TouchableOpacity>
+
+
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
+                {/* Beğeni sayısı */}
                 <Octicons
                   name="heart"
                   size={22}
                   color="#e63946"
-                  style={{ marginTop: 7 }}
+                  style={{ marginRight: 6 }}
                 />
-                <Text style={{ marginLeft: 6, fontWeight: 'bold', color: theme.textPrimary, marginTop: 8 }}>
+                <Text style={{ fontWeight: 'bold', color: theme.textPrimary, marginRight: 12 }}>
                   {isSpecialNutuk ? '∞ Beğeni' : `${likeCount} Beğeni`}
                 </Text>
+
+                {/* Paylaş butonu (ikon) */}
+                <TouchableOpacity
+                  onPress={handleShare}
+                  style={{
+                    padding: 8, // dokunma alanını biraz büyüt
+                    borderRadius: 16, // daha yuvarlak köşeler
+                    backgroundColor: theme.cardBackground, // tema uyumlu açık arka plan
+                    borderWidth: 1,
+                    borderColor: theme.toggleActive, // hafif bir kenarlık, ikon rengi ile uyumlu
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginLeft: 8, // diğer butonlardan biraz boşluk
+                  }}
+                >
+                  <Ionicons name="share-social-outline" size={20} color={theme.toggleActive} />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -698,7 +729,7 @@ export default function DetailScreen({ route, navigation }) {
             </>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </SafeAreaView >
       <Modal visible={editModalVisible} transparent animationType="slide">
         <View style={styles.modalBackground}>
           <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
@@ -1047,4 +1078,20 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: 20,
   },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,  // eskiden 14
+    paddingVertical: 5,     // eskiden 6
+    borderRadius: 12,
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+    elevation: 5,
+  },
+
+
 });
