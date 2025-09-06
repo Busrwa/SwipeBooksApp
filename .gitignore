@@ -5,6 +5,7 @@ node_modules/
 
 services/
 android/
+.env
 
 # Expo
 .expo/
